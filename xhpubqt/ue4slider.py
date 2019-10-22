@@ -2,7 +2,7 @@
 '''
 @Author: lamborghini1993
 @Date: 2019-10-16 15:43:53
-@UpdateDate: 2019-10-22 15:21:19
+@UpdateDate: 2019-10-22 17:39:48
 @Description: UE4样式的Slider
 '''
 
@@ -18,16 +18,20 @@ def float_equal(a: float, b: float)->bool:
 
 class UE4Slider(QtWidgets.QWidget):
     MAX = 99999999
+    valueChanged = QtCore.pyqtSignal(float)
+    editingFinished = QtCore.pyqtSignal(float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.speed = 10
+        self.speed = 1
         self.spin = None
-        self.value = 0
-        self.range = None
+        self.spinValue = 0
+        self.spinRange = None
         self.startpos = None
         self.bmove = False
         self.mousepos = None
+        self.backcolor = QtCore.Qt.white
+        self.frontcolor = QtGui.QColor(222, 111, 0)
         self._initSpin()
         self._init()
 
@@ -43,24 +47,36 @@ class UE4Slider(QtWidgets.QWidget):
         self.spin.setFocusPolicy(QtCore.Qt.NoFocus)
         self.spin.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         self.spin.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
-        self.spin.setStyleSheet("background: rgba(0,0,0,0);")
+        self.spin.setStyleSheet("background-color: rgba(0,0,0,0);")
         self.spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.spin.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
         self.setRange(-self.MAX, self.MAX)
+        self.spin.editingFinished.connect(self.editingFinished.emit)
 
     def setRange(self, l, r):
-        self.range = (l, r)
+        self.spinRange = (l, r)
         self.spin.setRange(l, r)
+
+    def range(self):
+        return self.spinRange
 
     def setSpeed(self, speed):
         self.speed = speed
 
     def setValue(self, value):
-        self.value = value
+        self.spinValue = value
         self.spin.setValue(value)
+        self.valueChanged.emit(self.value())
+        self.update()
+
+    def value(self):
+        return self.spinValue
 
     def setDecimals(self, prec: int):
         self.spin.setDecimals(prec)
+
+    def unlimit(self):
+        self.setRange(-self.MAX, self.MAX)
 
     def wheelEvent(self, wheelEvent):
         pass
@@ -75,13 +91,15 @@ class UE4Slider(QtWidgets.QWidget):
 
     def paintEvent(self, paintEvent):
         super().paintEvent(paintEvent)
+        if self._is_not_limit():
+            return
         painter = QtGui.QPainter(self)
         size = self.size()
         w, h = size.width(), size.height()
-        minimum, maximum = self.range
-        w = (self.value - minimum) * w / (maximum - minimum)
-        pen = QtGui.QPen(QtCore.Qt.red)
-        brush = QtGui.QBrush(QtCore.Qt.red)
+        minimum, maximum = self.spinRange
+        w = (self.spinValue - minimum) * w / (maximum - minimum)
+        pen = QtGui.QPen(self.frontcolor)
+        brush = QtGui.QBrush(self.frontcolor)
         painter.setPen(pen)
         painter.setBrush(brush)
         painter.drawRect(0, 0, w, h)
@@ -101,7 +119,7 @@ class UE4Slider(QtWidgets.QWidget):
         self.bmove = True
         pos = event.pos()
         movex = pos.x() - self.startpos.x()
-        self._MoveX(movex)
+        self._movex(movex)
         QtGui.QCursor.setPos(self.mousepos)
 
     def mouseReleaseEvent(self, event):
@@ -109,36 +127,54 @@ class UE4Slider(QtWidgets.QWidget):
         self.startpos = None
         self.setCursor(QtCore.Qt.SizeHorCursor)
         if self.bmove:
+            self.editingFinished.emit()
             return
         self.bmove = False
-        self._StartEditing()
+        self._start_editing()
 
-    def _MoveX(self, x):
-        minimum, maximum = self.range
+    def _is_not_limit(self):
+        minimum, maximum = self.spinRange
+        if maximum <= minimum:
+            return True
         if float_equal(-minimum, self.MAX) and float_equal(maximum, self.MAX):
-            # 没有限制的情况下
-            value = self.value + (self.value - minimum + 1) * x * self.speed / (maximum - minimum)
-        else:
-            value = self.value + (maximum - minimum) * x * self.speed / 1000
+            return True
+        return False
 
+    def _no_limit_add(self, x):
+        value = abs(self.spinValue)
+        base = 10
+        if self.spinValue * x >= 0:
+            result = value * x * self.speed / base
+        else:
+            result = value * x * self.speed / base / 2
+        if float_equal(result, 0):
+            result = self.speed * x / base / 10
+        return result
+
+    def _movex(self, x):
+        minimum, maximum = self.spinRange
+        if self._is_not_limit():    # 没有限制的情况下
+            value = self.spinValue + self._no_limit_add(x)
+        else:
+            value = self.spinValue + (maximum - minimum) * x * self.speed / 100
         if value > maximum:
             value = maximum
         elif value < minimum:
             value = minimum
         self.setValue(value)
 
-    def _StartEditing(self):
+    def _start_editing(self):
         self.spin.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.spin.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-        self.spin.editingFinished.connect(self._EditingFinished)
+        self.spin.editingFinished.connect(self._editing_finished)
         self.spin.setFocus()
         self.spin.selectAll()
 
-    def _EditingFinished(self):
+    def _editing_finished(self):
         value = self.spin.value()
         self.spin.setFocusPolicy(QtCore.Qt.NoFocus)
         self.spin.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-        self.spin.editingFinished.disconnect(self._EditingFinished)
+        self.spin.editingFinished.disconnect(self._editing_finished)
         self.setFocus()
         self.setValue(value)
 
@@ -161,8 +197,8 @@ class SampleWidget(QtWidgets.QWidget):
     def _Min(self):
         minimum = float(self.min.text())
         maximum = float(self.max.text())
-        if float_equal(minimum, 0) and float_equal(maximum, 0):
-            self.slide.setRange(-99999999, 99999999)
+        if float_equal(minimum, maximum):
+            self.slide.unlimit()
             return
         if minimum < maximum:
             self.slide.setRange(minimum, maximum)
