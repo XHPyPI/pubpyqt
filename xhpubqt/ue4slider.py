@@ -2,7 +2,7 @@
 '''
 @Author: lamborghini1993
 @Date: 2019-10-16 15:43:53
-@UpdateDate: 2019-10-22 17:39:48
+@UpdateDate: 2019-10-23 15:38:43
 @Description: UE4样式的Slider
 '''
 
@@ -19,14 +19,15 @@ def float_equal(a: float, b: float)->bool:
 class UE4Slider(QtWidgets.QWidget):
     MAX = 99999999
     valueChanged = QtCore.pyqtSignal(float)
-    editingFinished = QtCore.pyqtSignal(float)
+    editingFinished = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.speed = 1
         self.spin = None
         self.spinValue = 0
-        self.spinRange = None
+        self.spinRange = (-self.MAX, self.MAX)
+        self.realRange = (-self.MAX, self.MAX)
         self.startpos = None
         self.bmove = False
         self.mousepos = None
@@ -50,12 +51,11 @@ class UE4Slider(QtWidgets.QWidget):
         self.spin.setStyleSheet("background-color: rgba(0,0,0,0);")
         self.spin.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.spin.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-        self.setRange(-self.MAX, self.MAX)
+        self.spin.setRange(*self.realRange)
         self.spin.editingFinished.connect(self.editingFinished.emit)
 
     def setRange(self, l, r):
         self.spinRange = (l, r)
-        self.spin.setRange(l, r)
 
     def range(self):
         return self.spinRange
@@ -76,7 +76,7 @@ class UE4Slider(QtWidgets.QWidget):
         self.spin.setDecimals(prec)
 
     def unlimit(self):
-        self.setRange(-self.MAX, self.MAX)
+        self.setRange(*self.realRange)
 
     def wheelEvent(self, wheelEvent):
         pass
@@ -197,11 +197,10 @@ class SampleWidget(QtWidgets.QWidget):
     def _Min(self):
         minimum = float(self.min.text())
         maximum = float(self.max.text())
-        if float_equal(minimum, maximum):
-            self.slide.unlimit()
-            return
         if minimum < maximum:
             self.slide.setRange(minimum, maximum)
+        else:
+            self.slide.unlimit()
 
 
 if __name__ == '__main__':
