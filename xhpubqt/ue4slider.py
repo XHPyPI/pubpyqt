@@ -2,8 +2,21 @@
 '''
 @Author: lamborghini1993
 @Date: 2019-10-16 15:43:53
-@UpdateDate: 2019-10-23 15:38:43
+@UpdateDate: 2019-10-24 20:53:50
 @Description: UE4样式的Slider
+1. 如果没有设置范围不显示百分比，设置了才会显示
+2. 单机鼠标长按拖动可以调整数值，不可超过最大最小值，拖动时会隐藏鼠标箭头
+3. 单机鼠标可以手动输入数值，手动输入时可超过设定范围
+4. 无范围限制时会根据当前数值智能调整大小
+对外接口：
+    setRange/range
+    setValue/value
+    setSpeed
+    setDecimals
+    unlimit
+对外信号:
+    valueChanged
+    editingFinished
 '''
 
 import sys
@@ -55,27 +68,34 @@ class UE4Slider(QtWidgets.QWidget):
         self.spin.editingFinished.connect(self.editingFinished.emit)
 
     def setRange(self, l, r):
+        """设置滑动条范围"""
         self.spinRange = (l, r)
 
     def range(self):
+        """获取滑动条范围"""
         return self.spinRange
 
     def setSpeed(self, speed):
+        """设置滑动速度-灵敏度"""
         self.speed = speed
 
     def setValue(self, value):
+        """设置值"""
         self.spinValue = value
         self.spin.setValue(value)
         self.valueChanged.emit(self.value())
         self.update()
 
     def value(self):
+        """获取值"""
         return self.spinValue
 
     def setDecimals(self, prec: int):
+        """设置精确到小数点位数"""
         self.spin.setDecimals(prec)
 
     def unlimit(self):
+        """取消范围限制"""
         self.setRange(*self.realRange)
 
     def wheelEvent(self, wheelEvent):
